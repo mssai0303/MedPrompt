@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MedPrompt — Symptom Guide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root{
+        /* ==== THEME (edit just these to recolor the whole app) ==== */
+        --bg: #071220;                /* page background */
+        --card: #111d33;              /* card background */
+        --muted: #9fb0cc;             /* secondary text */
+        --text: #e9f0fb;              /* main text */
+        --accent: #5aa9ff;            /* primary brand */
+        --accent-2: #34d399;          /* success tint */
+        --danger: #f87171;            /* red flags */
+        --ring: #223b66;              /* borders */
+        --glass: rgba(255,255,255,.06);
+      }
+      *{box-sizing:border-box}
+      html,body{height:100%}
+      body{
+        margin:0; padding:40px 16px; background:var(--bg); color:var(--text);
+        font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+        display:flex; justify-content:center; align-items:flex-start;
+      }
+      .wrap{width:100%; max-width:920px}
+      .card{
+        background:var(--card); border:1px solid var(--ring);
+        border-radius:22px; padding:28px; box-shadow:0 16px 60px rgba(0,0,0,.35);
+        backdrop-filter:saturate(120%) blur(6px); animation:fade .35s ease
+      }
+      .row{display:flex; align-items:center; justify-content:space-between; gap:12px}
+      h1{margin:0; font-size:30px; letter-spacing:.2px}
+      .note{color:var(--muted); font-size:13px; margin:6px 0 18px}
+      textarea{
+        width:100%; min-height:160px; border-radius:16px; border:1px solid var(--ring);
+        background:#0a1830; color:var(--text); padding:14px; font-size:15px; resize:vertical;
+        outline:none; box-shadow:0 0 0 0 rgba(0,0,0,0);
+      }
+      textarea:focus{box-shadow:0 0 0 2px var(--accent); border-color:transparent}
+      .btn{
+        appearance:none; border:0; padding:10px 16px; border-radius:12px; cursor:pointer;
+        font-weight:600; color:#08111e; background:var(--accent);
+      }
+      .btn:disabled{opacity:.65; cursor:not-allowed}
+      .btn-ghost{
+        background:transparent; color:var(--text); border:1px solid var(--ring);
+      }
+      .grid{display:grid; gap:14px}
+      .section{
+        background:#0a1830; border:1px solid var(--ring); border-radius:16px; padding:16px;
+      }
+      .sec-title{margin:0 0 8px; font-size:18px}
+      .pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:6px 10px;
+        border-radius:999px; border:1px solid var(--ring); background:var(--glass)}
+      .pill.danger{border-color:rgba(248,113,113,.35); color:#ffd2d2; background:rgba(248,113,113,.08)}
+      .list{padding-left:20px; margin:0; display:grid; gap:6px}
+      .toolbar{display:flex; gap:8px; flex-wrap:wrap}
+      .footer{color:var(--muted); font-size:12px; margin-top:10px}
+      a{color:#93c5fd}
+      @keyframes fade{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+
+      /* Modal */
+      .modal-backdrop{
+        position:fixed; inset:0; background:rgba(0,0,0,.55);
+        display:none; align-items:center; justify-content:center; padding:16px;
+      }
+      .modal{max-width:920px; width:100%; background:var(--card); border:1px solid var(--ring);
+        color:var(--text); border-radius:20px; padding:20px; box-shadow:0 20px 80px rgba(0,0,0,.5)}
+      .modal h2{margin:0 0 8px}
+      .modal p{margin:8px 0; color:var(--text)}
+      .muted{color:var(--muted)}
+      .two-col{display:grid; gap:16px}
+      @media(min-width:860px){ .two-col{grid-template-columns:1.1fr .9fr} }
+      .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; background:#0b1730; padding:2px 6px; border-radius:6px; border:1px solid var(--ring)}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="row">
+          <div>
+            <h1>MedPrompt — Symptom Guide</h1>
+            <p class="note">⚠️ Not medical advice. For severe symptoms, call emergency services.</p>
+          </div>
+          <div class="toolbar">
+            <button id="aboutBtn" class="btn-ghost">About</button>
+            <button id="themeBtn" class="btn-ghost" title="Toggle theme">Theme</button>
+          </div>
+        </div>
+
+        <textarea id="symptoms" placeholder="Describe symptoms (anonymous)"></textarea>
+        <div class="row" style="margin-top:12px">
+          <div class="toolbar">
+            <button class="btn" id="ask">Analyze</button>
+            <button class="btn-ghost" id="copyBtn">Copy result</button>
+            <button class="btn-ghost" id="downloadBtn">Download JSON</button>
+          </div>
+          <span class="pill" id="charCount">0/1000</span>
+        </div>
+
+        <div id="out" class="grid" style="margin-top:16px; display:none">
+          <section class="section">
+            <h3 class="sec-title">Summary</h3>
+            <p id="sum"></p>
+          </section>
+
+          <section class="section">
+            <h3 class="sec-title">Possible causes</h3>
+            <ul id="diff" class="list"></ul>
+          </section>
+
+          <div class="grid" style="grid-template-columns:1fr; gap:14px">
+            <section class="section">
+              <h3 class="sec-title">Home care</h3>
+              <ul id="home" class="list"></ul>
+            </section>
+            <section class="section">
+              <h3 class="sec-title">Red flags</h3>
+              <div id="flags" class="toolbar"></div>
+            </section>
+          </div>
+
+          <section class="section">
+            <h3 class="sec-title">Disclaimer</h3>
+            <p id="disc" class="muted"></p>
+          </section>
+
+          <p class="footer">This tool is for education only and should not be used for diagnosis or treatment.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- About modal (your project brief, vendor-neutral) -->
+    <div id="aboutWrap" class="modal-backdrop" aria-hidden="true">
+      <div class="modal">
+        <div class="row" style="margin-bottom:6px">
+          <h2 style="margin:0">MedPrompt — An AI-Powered Clinical Reasoning Chatbot</h2>
+          <button id="closeAbout" class="btn-ghost">Close</button>
+        </div>
+        <div class="two-col">
+          <div>
+            <h3>Business Problem</h3>
+            <p>
+              Many people search the internet to interpret symptoms, but most tools are vague and lack transparent reasoning.
+              MedPrompt simulates structured clinical reasoning to suggest likely conditions and when to seek care.
+            </p>
+
+            <h3>Dataset & Source</h3>
+            <p>
+              We reference the <b>MedCaseReasoning</b> dataset (14.5k+ cases with prompts, reasoning, and diagnoses).<br/>
+              🔗 <a href="https://huggingface.co/datasets/zou-lab/MedCaseReasoning" target="_blank" rel="noopener">HuggingFace – MedCaseReasoning</a>
+            </p>
+          </div>
+
+          <div>
+            <h3>Use of Data Analytics</h3>
+            <ul class="list">
+              <li>Preprocess symptom text, normalize entities.</li>
+              <li>Match cases and generate concise differential reasoning.</li>
+              <li>Measure accuracy and reasoning quality on held-out cases.</li>
+              <li>Collect anonymized feedback to improve guidance.</li>
+            </ul>
+
+            <h3>Expected Outcome</h3>
+            <p>
+              A web chatbot that provides clear summaries, plausible differentials, home-care suggestions, and red-flag alerts —
+              improving understandability and access to care.
+            </p>
+          </div>
+        </div>
+        <p class="muted" style="margin-top:12px">
+          Note: This demo intentionally avoids vendor branding. The reasoning engine runs on a private backend endpoint.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // --- Elements
+      const btn = document.getElementById('ask');
+      const out = document.getElementById('out');
+      const symptoms = document.getElementById('symptoms');
+      const charCount = document.getElementById('charCount');
+      const sumEl = document.getElementById('sum');
+      const diffEl = document.getElementById('diff');
+      const homeEl = document.getElementById('home');
+      const flagsEl = document.getElementById('flags');
+      const discEl = document.getElementById('disc');
+      const copyBtn = document.getElementById('copyBtn');
+      const downloadBtn = document.getElementById('downloadBtn');
+
+      // About modal + theme
+      const aboutBtn = document.getElementById('aboutBtn');
+      const aboutWrap = document.getElementById('aboutWrap');
+      const closeAbout = document.getElementById('closeAbout');
+      const themeBtn = document.getElementById('themeBtn');
+
+      // --- Character counter
+      symptoms.addEventListener('input', () => {
+        if (symptoms.value.length > 1000) symptoms.value = symptoms.value.slice(0, 1000);
+        charCount.textContent = symptoms.value.length + "/1000";
+      });
+
+      // --- Theme toggle (dark <-> deep teal)
+      let alt = false;
+      themeBtn.onclick = () => {
+        alt = !alt;
+        if (alt) {
+          document.documentElement.style.setProperty('--bg', '#0b0d12');
+          document.documentElement.style.setProperty('--card', '#0f1420');
+          document.documentElement.style.setProperty('--accent', '#8b5cf6'); /* purple */
+        } else {
+          document.documentElement.style.setProperty('--bg', '#071220');
+          document.documentElement.style.setProperty('--card', '#111d33');
+          document.documentElement.style.setProperty('--accent', '#5aa9ff');
+        }
+      };
+
+      // --- About modal controls
+      aboutBtn.onclick = () => { aboutWrap.style.display = 'flex'; aboutWrap.setAttribute('aria-hidden','false'); };
+      closeAbout.onclick = () => { aboutWrap.style.display = 'none'; aboutWrap.setAttribute('aria-hidden','true'); };
+      aboutWrap.addEventListener('click', (e)=>{ if(e.target === aboutWrap) closeAbout.click(); });
+
+      // --- Analyze
+      btn.onclick = async () => {
+        const userText = symptoms.value.trim();
+        if (!userText) return alert('Please enter your symptoms.');
+        btn.disabled = true; btn.textContent = 'Processing…'; out.style.display='none';
+        try {
+          const r = await fetch('/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userText })
+          });
+          const j = await r.json();
+          if (!j.ok) throw new Error(j.error || 'Error');
+          const d = j.data;
+
+          // Render
+          sumEl.textContent = d.summary || '';
+
+          diffEl.innerHTML = '';
+          (d.differential || []).forEach(x => {
+            const li = document.createElement('li');
+            li.innerHTML = `<b>${escapeHtml(x.condition || '')}</b> — ${escapeHtml(x.why || '')}`;
+            diffEl.appendChild(li);
+          });
+
+          homeEl.innerHTML = '';
+          (d.homeCare || []).forEach(s => {
+            const li = document.createElement('li'); li.textContent = s; homeEl.appendChild(li);
+          });
+
+          flagsEl.innerHTML = '';
+          (d.redFlags || []).forEach(s => {
+            const sp = document.createElement('span'); sp.className='pill danger'; sp.textContent = s; flagsEl.appendChild(sp);
+          });
+
+          discEl.textContent = d.disclaimer || 'For education only.';
+          out.style.display = 'block';
+        } catch (e) {
+          out.style.display = 'block';
+          out.innerHTML = `<section class="section"><h3 class="sec-title">Error</h3><p>${escapeHtml(e.message || 'Something went wrong. Try again later.')}</p></section>`;
+        } finally {
+          btn.disabled = false; btn.textContent = 'Analyze';
+        }
+      };
+
+      // --- Utilities
+      function escapeHtml(s){
+        return (s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+      }
+
+      // Copy / Download
+      copyBtn.onclick = async () => {
+        const payload = {
+          summary: sumEl.textContent,
+          differential: [...diffEl.querySelectorAll('li')].map(li => li.textContent),
+          homeCare: [...homeEl.querySelectorAll('li')].map(li => li.textContent),
+          redFlags:  [...flagsEl.querySelectorAll('.pill')].map(p => p.textContent),
+          disclaimer: discEl.textContent
+        };
+        try { await navigator.clipboard.writeText(JSON.stringify(payload, null, 2)); copyBtn.textContent = 'Copied'; setTimeout(()=>copyBtn.textContent='Copy result', 900); } catch {}
+      };
+      downloadBtn.onclick = () => {
+        const payload = {
+          summary: sumEl.textContent,
+          differential: [...diffEl.querySelectorAll('li')].map(li => li.textContent),
+          homeCare: [...homeEl.querySelectorAll('li')].map(li => li.textContent),
+          redFlags:  [...flagsEl.querySelectorAll('.pill')].map(p => p.textContent),
+          disclaimer: discEl.textContent
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'medprompt-result.json'; a.click();
+        URL.revokeObjectURL(url);
+      };
+    </script>
+  </body>
+</html>
